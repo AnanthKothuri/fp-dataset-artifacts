@@ -1,0 +1,152 @@
+[
+    {
+        "premise": "The cat is next to the couch.",
+        "hypothesis": "The cat is on the furniture.",
+        "label": 2
+    },
+    {
+        "premise": "The boy is playing soccer in the park.",
+        "hypothesis": "The boy is running a lot.",
+        "label": 0
+    },
+    {
+        "premise": "The chef prepared a delicious meal.",
+        "hypothesis": "The chef bought something delicious.",
+        "label": 2
+    },
+    {
+        "premise": "A woman is walking her dog on the street.",
+        "hypothesis": "The woman is talking with her friend.",
+        "label": 1
+    },
+    {
+        "premise": "The weather today is sunny but cold.",
+        "hypothesis": "It is raining outside.",
+        "label": 1
+    },
+    {
+        "premise": "The man is reading a book in the airport.",
+        "hypothesis": "The man is studying in a quiet place.",
+        "label": 2
+    },
+    {
+        "premise": "The train left the station at 10 AM.",
+        "hypothesis": "The train arrived at the station at 9 AM.",
+        "label": 1
+    },
+    {
+        "premise": "A child is painting a picture with watercolors.",
+        "hypothesis": "The child is creating music.",
+        "label": 2
+    },
+    {
+        "premise": "The flowers in the garden are drooping.",
+        "hypothesis": "The garden is full of blooming flowers.",
+        "label": 2
+    },
+    {
+        "premise": "The airplane is flying through the clouds.",
+        "hypothesis": "The airplane is high off the ground.",
+        "label": 0
+    },
+    {
+        "premise": "A dog is barking at a stranger near the house.",
+        "hypothesis": "The dog is running towards strangers.",
+        "label": 1
+    },
+    {
+        "premise": "The student missed their assignment deadline.",
+        "hypothesis": "The assignment was submitted late.",
+        "label": 0
+    },
+    {
+        "premise": "The artist is drawing a portrait of a woman.",
+        "hypothesis": "The artist is painting a face.",
+        "label": 0
+    },
+    {
+        "premise": "A group of friends is watching a movie together.",
+        "hypothesis": "The group is eating popcorn.",
+        "label": 1
+    },
+    {
+        "premise": "The marathon runners are crossing the finish line.",
+        "hypothesis": "The race hasn't ended for any runners.",
+        "label": 2
+    },
+    {
+        "premise": "The pizza delivery arrived earlier than expected.",
+        "hypothesis": "The pizza was delivered late.",
+        "label": 2
+    },
+    {
+        "premise": "The child built a sandcastle at the beach.",
+        "hypothesis": "The child played in the water.",
+        "label": 1
+    },
+    {
+        "premise": "The comedian performed in front of a large audience.",
+        "hypothesis": "The comedian played music for a crowd.",
+        "label": 2
+    },
+    {
+        "premise": "The scientist submitted to a conference.",
+        "hypothesis": "The scientist is writing a research paper.",
+        "label": 0
+    },
+    {
+        "premise": "The car broke down on the highway.",
+        "hypothesis": "The car is in bad condition.",
+        "label": 0
+    },
+    {
+        "premise": "The teacher gave the math problem to the students.",
+        "hypothesis": "The teacher provided a solution to the problem.",
+        "label": 1
+    },
+    {
+        "premise": "The family is having dinner at a restaurant.",
+        "hypothesis": "The family is eating with friends.",
+        "label": 1
+    },
+    {
+        "premise": "The athlete won a gold medal in the competition.",
+        "hypothesis": "The athlete was unsuccessful in the event.",
+        "label": 2
+    },
+    {
+        "premise": "The book is on the top shelf of the library.",
+        "hypothesis": "The book is easy to read.",
+        "label": 1
+    },
+    {
+        "premise": "The city lights are glowing dimly at night.",
+        "hypothesis": "The city is very illuminated in the evening.",
+        "label": 2
+    },
+    {
+        "premise": "The baby is hungry in the crib.",
+        "hypothesis": "The baby is awake and crying.",
+        "label": 0
+    },
+    {
+        "premise": "The couple is celebrating their wedding anniversary with all their friends.",
+        "hypothesis": "The couple is having a party.",
+        "label": 0
+    },
+    {
+        "premise": "The police officer directed traffic at the busy intersection.",
+        "hypothesis": "The police officer helped maintain order in his car.",
+        "label": 2
+    },
+    {
+        "premise": "The grocery store is open from 8 AM to 10 PM.",
+        "hypothesis": "The store is closed on holidays.",
+        "label": 1
+    },
+    {
+        "premise": "The dog fetched the ball thrown by its owner.",
+        "hypothesis": "The dog played with its tail.",
+        "label": 2
+    }
+]

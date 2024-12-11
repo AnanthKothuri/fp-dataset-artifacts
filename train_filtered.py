@@ -10,6 +10,51 @@ import json
 NUM_PREPROCESSING_WORKERS = 2
 
 
+# creating debiasing trainer
+import torch
+class DebiasingTrainer(Trainer):
+    def __init__(self, *args, weak_model=None, tokenizer=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.weak_model = weak_model
+        self.tokenizer = tokenizer
+
+    def compute_loss(self, model, inputs, num_items_in_batch, return_outputs=False):
+        device = next(model.parameters()).device
+
+        self.weak_model = self.weak_model.to(device)
+        inputs = {key: val.to(device) if torch.is_tensor(val) else val for key, val in inputs.items()}
+        labels = inputs.get("labels")
+
+        outputs = model(**inputs)
+        logits = outputs.logits
+
+        # Forward pass for the weak model
+        with torch.no_grad():
+            weak_model_outputs = self.weak_model(
+                input_ids=inputs["input_ids"],
+                attention_mask=inputs["attention_mask"]
+            )
+            weak_probs = torch.softmax(weak_model_outputs.logits, dim=-1)
+
+            # Ensure weak_probs and labels are on the same device
+            weak_probs = weak_probs.to(device)
+            labels = labels.to(device)
+
+            # Compute weights
+            true_probs = weak_probs[range(len(labels)), labels]
+            weights = 1.0 - true_probs
+
+        # Compute loss
+        loss_fn = torch.nn.CrossEntropyLoss(reduction='none')
+        loss = loss_fn(logits, labels)
+
+        # Compute weighted loss
+        weighted_loss = (weights * loss).mean()
+
+        # Return weighted loss and outputs if required
+        return (weighted_loss, outputs) if return_outputs else weighted_loss
+
+
 def main():
     argp = HfArgumentParser(TrainingArguments)
     # The HfArgumentParser object collects command-line arguments into an object (and provides default values for unspecified arguments).
@@ -29,81 +74,46 @@ def main():
     #     Where to put the trained model checkpoint(s) and any eval predictions.
     #     *This argument is required*.
 
+    task = 'nli'
     argp.add_argument('--model', type=str,
                       default='google/electra-small-discriminator',
                       help="""This argument specifies the base model to fine-tune.
         This should either be a HuggingFace model ID (see https://huggingface.co/models)
         or a path to a saved model checkpoint (a folder containing config.json and pytorch_model.bin).""")
-    argp.add_argument('--task', type=str, choices=['nli', 'qa'], required=True,
-                      help="""This argument specifies which task to train/evaluate on.
-        Pass "nli" for natural language inference or "qa" for question answering.
-        By default, "nli" will use the SNLI dataset, and "qa" will use the SQuAD dataset.""")
-    argp.add_argument('--dataset', type=str, default=None,
-                      help="""This argument overrides the default dataset used for the specified task.""")
+    argp.add_argument('--weak_model', type=str,
+                      default='google/electra-small-discriminator',
+                      help="""This argument specifies the base model to fine-tune.
+        This should either be a HuggingFace model ID (see https://huggingface.co/models)
+        or a path to a saved model checkpoint (a folder containing config.json and pytorch_model.bin).""")
     argp.add_argument('--max_length', type=int, default=128,
                       help="""This argument limits the maximum sequence length used during training/evaluation.
         Shorter sequence lengths need less memory and computation time, but some examples may end up getting truncated.""")
     argp.add_argument('--max_train_samples', type=int, default=None,
                       help='Limit the number of examples to train on.')
-    argp.add_argument('--max_eval_samples', type=int, default=None,
-                      help='Limit the number of examples to evaluate on.')
     
-
     training_args, args = argp.parse_args_into_dataclasses()
 
-    # Dataset selection
-    # IMPORTANT: this code path allows you to load custom datasets different from the standard SQuAD or SNLI ones.
-    # You need to format the dataset appropriately. For SNLI, you can prepare a file with each line containing one
-    # example as follows:
-    # {"premise": "Two women are embracing.", "hypothesis": "The sisters are hugging.", "label": 1}
-    if args.dataset.endswith('.json') or args.dataset.endswith('.jsonl'):
-        dataset_id = None
-        # Load from local json/jsonl file
-        dataset = datasets.load_dataset('json', data_files=args.dataset)
-        # By default, the "json" dataset loader places all examples in the train split,
-        # so if we want to use a jsonl file for evaluation we need to get the "train" split
-        # from the loaded dataset
-        eval_split = 'train'
-    else:
-        default_datasets = {'qa': ('squad',), 'nli': ('snli',)}
-        dataset_id = tuple(args.dataset.split(':')) if args.dataset is not None else \
-            default_datasets[args.task]
-        # MNLI has two validation splits (one with matched domains and one with mismatched domains). Most datasets just have one "validation" split
-        eval_split = 'validation_matched' if dataset_id == ('glue', 'mnli') else 'validation'
-        # Load the raw data
-        dataset = datasets.load_dataset(*dataset_id)
-    
-    # NLI models need to have the output label count specified (label 0 is "entailed", 1 is "neutral", and 2 is "contradiction")
-    task_kwargs = {'num_labels': 3} if args.task == 'nli' else {}
 
-    # Here we select the right model fine-tuning head
-    model_classes = {'qa': AutoModelForQuestionAnswering,
-                     'nli': AutoModelForSequenceClassification}
-    model_class = model_classes[args.task]
-    # Initialize the model and tokenizer from the specified pretrained model/checkpoint
+    dataset_id = 'snli'
+    eval_split = 'validation'
+    dataset = datasets.load_dataset(dataset_id)
+    task_kwargs = {'num_labels': 3}
+
+
+    model_class = AutoModelForSequenceClassification
     model = model_class.from_pretrained(args.model, **task_kwargs)
-    # Make tensor contiguous if needed https://github.com/huggingface/transformers/issues/28293
     if hasattr(model, 'electra'):
         for param in model.electra.parameters():
             if not param.is_contiguous():
                 param.data = param.data.contiguous()
     tokenizer = AutoTokenizer.from_pretrained(args.model, use_fast=True)
 
-    # Select the dataset preprocessing function (these functions are defined in helpers.py)
-    if args.task == 'qa':
-        prepare_train_dataset = lambda exs: prepare_train_dataset_qa(exs, tokenizer)
-        prepare_eval_dataset = lambda exs: prepare_validation_dataset_qa(exs, tokenizer)
-    elif args.task == 'nli':
-        prepare_train_dataset = prepare_eval_dataset = \
-            lambda exs: prepare_dataset_nli(exs, tokenizer, args.max_length)
-        # prepare_eval_dataset = prepare_dataset_nli
-    else:
-        raise ValueError('Unrecognized task name: {}'.format(args.task))
+
+    prepare_train_dataset = prepare_eval_dataset = \
+        lambda exs: prepare_dataset_nli(exs, tokenizer, args.max_length)
 
     print("Preprocessing data... (this takes a little bit, should only happen once per dataset)")
-    if dataset_id == ('snli',):
-        # remove SNLI examples with no label
-        dataset = dataset.filter(lambda ex: ex['label'] != -1)
+    dataset = dataset.filter(lambda ex: ex['label'] != -1)
     
     train_dataset = None
     eval_dataset = None
@@ -131,21 +141,8 @@ def main():
         )
 
     # Select the training configuration
-    trainer_class = Trainer
     eval_kwargs = {}
-    # If you want to use custom metrics, you should define your own "compute_metrics" function.
-    # For an example of a valid compute_metrics function, see compute_accuracy in helpers.py.
-    compute_metrics = None
-    if args.task == 'qa':
-        # For QA, we need to use a tweaked version of the Trainer (defined in helpers.py)
-        # to enable the question-answering specific evaluation metrics
-        trainer_class = QuestionAnsweringTrainer
-        eval_kwargs['eval_examples'] = eval_dataset
-        metric = evaluate.load('squad')   # datasets.load_metric() deprecated
-        compute_metrics = lambda eval_preds: metric.compute(
-            predictions=eval_preds.predictions, references=eval_preds.label_ids)
-    elif args.task == 'nli':
-        compute_metrics = compute_accuracy
+    compute_metrics = compute_accuracy
     
 
     # This function wraps the compute_metrics function, storing the model's predictions
@@ -156,14 +153,17 @@ def main():
         eval_predictions = eval_preds
         return compute_metrics(eval_preds)
 
+    weak_model = AutoModelForSequenceClassification.from_pretrained(args.weak_model, num_labels=3)
+    weak_model.eval()  # Set to evaluation mode
     # Initialize the Trainer object with the specified arguments and the model and dataset we loaded above
-    trainer = trainer_class(
+    trainer = DebiasingTrainer(
         model=model,
         args=training_args,
         train_dataset=train_dataset_featurized,
         eval_dataset=eval_dataset_featurized,
         tokenizer=tokenizer,
-        compute_metrics=compute_metrics_and_store_predictions
+        compute_metrics=compute_metrics_and_store_predictions,
+        weak_model=weak_model
     )
     # Train and/or evaluate
     if training_args.do_train:
