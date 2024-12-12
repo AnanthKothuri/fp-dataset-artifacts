@@ -159,10 +159,30 @@ def main():
     eval_dataset = None
     train_dataset_featurized = None
     eval_dataset_featurized = None
+
+    with open('fp-dataset-artifacts/data_mapping/data_statistics.json', 'r') as file:
+        data = json.load(file)
+
+    filtered_pairs = set()
+    for key, value in data.items():
+        if value['mean'] > 0.5 and value['std'] < 0.2:
+            filtered_pairs.add(key)
+
     if training_args.do_train:
         train_dataset = dataset['train']
+        print(type(train_dataset))
         if args.max_train_samples:
             train_dataset = train_dataset.select(range(args.max_train_samples))
+        
+        new_dataset = []
+        for i in range(len(train_dataset)):
+            cur_example = train_dataset[i]
+            cur_key = cur_example["premise"] + ":" + cur_example["hypothesis"]
+            if cur_key not in filtered_pairs:
+                new_dataset.append(cur_example)  
+
+        from datasets import Dataset
+        train_dataset = Dataset.from_list(new_dataset)          
             
         train_dataset_featurized = train_dataset.map(
             prepare_train_dataset,
