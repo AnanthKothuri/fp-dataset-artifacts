@@ -21,40 +21,34 @@ class DataCartographyTrainer(Trainer):
         self.example_probs = {}
 
     def compute_loss(self, model, inputs, return_outputs=False, num_items_in_batch=None):
-        token_type_ids = inputs.get("token_type_ids")
         input_ids = inputs.get("input_ids")
         labels = inputs.get("labels")
 
-        # Decode the input_ids back to text
+        # Create a mask to identify non-special tokens
+        # This will be True for tokens we want to keep
+        mask = (
+            (input_ids != self.processing_class.cls_token_id) & 
+            (input_ids != self.processing_class.pad_token_id) & 
+            (input_ids != self.processing_class.sep_token_id)
+        )
+
+        # Decode only the non-special tokens
         decoded_texts = []
-        for batch_input_ids in input_ids:
-            # Remove special tokens manually
-            # Remove [CLS] (usually the first token)
-            # Remove [PAD] tokens at the end
-            cleaned_input_ids = batch_input_ids[:]
-            while cleaned_input_ids[0] == self.processing_class.cls_token_id:
-                cleaned_input_ids = cleaned_input_ids[1:]
-            
-            # Remove trailing PAD tokens
-            while cleaned_input_ids[-1] == self.processing_class.pad_token_id:
-                cleaned_input_ids = cleaned_input_ids[:-1]
+        for batch_input_ids, batch_mask in zip(input_ids, mask):
+            # Select only the tokens we want to keep
+            cleaned_input_ids = batch_input_ids[batch_mask]
             
             # Decode the cleaned input
             full_text = self.processing_class.decode(cleaned_input_ids)
             
-            # Split the text at the separator
-            parts = full_text.split(self.processing_class.sep_token)
+            # Split the text
+            parts = full_text.split()  # Use split without arguments to handle multiple whitespaces
             
-            if len(parts) >= 2:
-                premise = parts[0].strip()
-                hypothesis = parts[1].strip()
-                
-                decoded_texts.append({
-                    'premise': premise,
-                    'hypothesis': hypothesis
-                })
-            else:
-                decoded_texts.append({'full_text': full_text})
+            # Reconstruct premise and hypothesis
+            decoded_texts.append({
+                'premise': ' '.join(parts[:len(parts)//2]),
+                'hypothesis': ' '.join(parts[len(parts)//2:])
+            })
 
         # Forward pass through the model
         outputs = model(**inputs)
