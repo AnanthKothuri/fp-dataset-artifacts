@@ -5,9 +5,7 @@ contrast_result = []
 
 with open("fp-dataset-artifacts/original_output/eval_predictions.jsonl", "r") as file:
     for line in file:
-        # Parse each line as JSON
         data = json.loads(line.strip())
-        # Extract required fields into an inner array
         inner_array = [
             data["premise"],
             data["hypothesis"],
@@ -15,14 +13,11 @@ with open("fp-dataset-artifacts/original_output/eval_predictions.jsonl", "r") as
             data["predicted_label"],
             data["label"] == data["predicted_label"]
         ]
-        # Append to the result array
         original_result.append(inner_array)
 
 with open("fp-dataset-artifacts/contrast_output/eval_predictions.jsonl", "r") as file:
     for line in file:
-        # Parse each line as JSON
         data = json.loads(line.strip())
-        # Extract required fields into an inner array
         inner_array = [
             data["premise"],
             data["hypothesis"],
@@ -30,7 +25,6 @@ with open("fp-dataset-artifacts/contrast_output/eval_predictions.jsonl", "r") as
             data["predicted_label"],
             data["label"] == data["predicted_label"]
         ]
-        # Append to the result array
         contrast_result.append(inner_array)
 
 result = []

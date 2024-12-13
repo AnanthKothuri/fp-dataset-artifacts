@@ -28,30 +28,21 @@ class DebiasingTrainer(Trainer):
         outputs = model(**inputs)
         logits = outputs.logits
 
-        # Forward pass for the weak model
         with torch.no_grad():
             weak_model_outputs = self.weak_model(
                 input_ids=inputs["input_ids"],
                 attention_mask=inputs["attention_mask"]
             )
             weak_probs = torch.softmax(weak_model_outputs.logits, dim=-1)
-
-            # Ensure weak_probs and labels are on the same device
             weak_probs = weak_probs.to(device)
             labels = labels.to(device)
 
-            # Compute weights
             true_probs = weak_probs[range(len(labels)), labels]
             weights = 1.0 - true_probs
 
-        # Compute loss
         loss_fn = torch.nn.CrossEntropyLoss(reduction='none')
         loss = loss_fn(logits, labels)
-
-        # Compute weighted loss
         weighted_loss = (weights * loss).mean()
-
-        # Return weighted loss and outputs if required
         return (weighted_loss, outputs) if return_outputs else weighted_loss
 
 
@@ -140,7 +131,6 @@ def main():
             remove_columns=eval_dataset.column_names
         )
 
-    # Select the training configuration
     eval_kwargs = {}
     compute_metrics = compute_accuracy
     

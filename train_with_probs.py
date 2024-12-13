@@ -24,66 +24,46 @@ class DataCartographyTrainer(Trainer):
         input_ids = inputs.get("input_ids")
         labels = inputs.get("labels")
 
-        # Create a mask to identify non-special tokens
-        # This will be True for tokens we want to keep
         mask = (
             (input_ids != self.processing_class.cls_token_id) & 
             (input_ids != self.processing_class.pad_token_id) & 
             (input_ids != self.processing_class.sep_token_id)
         )
 
-        # Decode only the non-special tokens
         decoded_texts = []
         for batch_input_ids, batch_mask in zip(input_ids, mask):
-            # Select only the tokens we want to keep
             cleaned_input_ids = batch_input_ids[batch_mask]
-            
-            # Decode the cleaned input
             full_text = self.processing_class.decode(cleaned_input_ids)
             
-            # Split the text
-            parts = full_text.split()  # Use split without arguments to handle multiple whitespaces
-            
-            # Reconstruct premise and hypothesis
+            parts = full_text.split()
             decoded_texts.append({
                 'premise': ' '.join(parts[:len(parts)//2]),
                 'hypothesis': ' '.join(parts[len(parts)//2:])
             })
 
-        # Forward pass through the model
         outputs = model(**inputs)
         logits = outputs.logits
 
-        # Compute probabilities
         probs = torch.softmax(logits, dim=-1)
         correct_probs = probs[range(len(labels)), labels]
 
-        # Track probabilities for each example using (premise, hypothesis) as key
         for idx, (text_info, prob) in enumerate(zip(decoded_texts, correct_probs)):
-            # Handle the case where we have full_text (in case separator wasn't found)
             if 'full_text' in text_info:
                 key = text_info['full_text']
             else:
                 key = (text_info['premise'], text_info['hypothesis'])
-            
-            # Initialize the list for this key if it doesn't exist
             if key not in self.example_probs:
                 self.example_probs[key] = []
             
-            # Append the probability
             self.example_probs[key].append(prob.item())
 
-        # Compute the loss
         loss = outputs.loss
-        
-        # Ensure loss is not None
         if loss is None:
             raise ValueError("Model returned None for the loss. Check your model's forward pass.")
 
         return (loss, outputs) if return_outputs else loss
 
     def create_statistics(self):
-        # Calculate mean and standard deviation for each example
         example_stats = {
             f"{premise}:{hypothesis}": {
                 "mean": np.mean(probs),
@@ -92,7 +72,6 @@ class DataCartographyTrainer(Trainer):
             for (premise, hypothesis), probs in self.example_probs.items()
         }
 
-        # Save stats to file
         with open("fp-dataset-artifacts/data_mapping/data_statistics.json", "w") as f:
             import json
             json.dump(example_stats, f, indent=4)
@@ -103,14 +82,6 @@ from transformers import DataCollatorWithPadding
 class CustomDataCollator(DataCollatorWithPadding):
     def __call__(self, features):
         batch = super().__call__(features)
-        print(features)
-        
-        # Generate example_ids if not present
-        # batch['example_ids'] = torch.tensor([
-        #     f.get('example_ids', torch.tensor(int(uuid.uuid4().hex[:8], 16))) for f in features
-        # ])
-        
-        # Ensure labels are present
         batch['labels'] = torch.tensor([f['labels'] for f in features])
         batch['example_ids'] = torch.tensor([f['example_ids'] for f in features])
         
